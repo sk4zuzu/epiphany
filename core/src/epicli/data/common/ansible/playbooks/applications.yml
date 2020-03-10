@@ -4,7 +4,7 @@
 - hosts: all
   tasks: [ ]  
 
-- hosts: applications
+- hosts: applications:!kubernetes_master[1:]
   become: true
   become_method: sudo
   pre_tasks:

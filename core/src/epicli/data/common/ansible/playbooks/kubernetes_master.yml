@@ -3,9 +3,10 @@
 
 - hosts: all
   gather_facts: yes
-  tasks: [ ]  
+  tasks: [ ]
 
 - hosts: kubernetes_master
+  serial: 1
   become: true
   become_method: sudo
   pre_tasks:
