@@ -1,0 +1,50 @@
+---
+- delegate_to: "{{ groups.kubernetes_master.0 }}"
+  block:
+    - name: Drain the target node
+      shell: |
+        kubectl drain node/{{ ansible_fqdn }}
+      args:
+        executable: /bin/bash
+      environment:
+        KUBECONFIG: /etc/kubernetes/admin.conf
+
+- block:
+    - name: Reset kuberentes node
+      shell: |
+        kubeadm reset --force
+
+    - name: Stop services
+      systemd:
+        name: "{{ item }}"
+        state: stopped
+      loop:
+        - kubelet
+        - docker
+
+    - name: Cleanup cni
+      vars:
+        dirs:
+          - /etc/cni/net.d
+          - /run/flannel
+          - /var/lib/cni
+      block:
+        - file:
+            path: "{{ item }}/"
+            state: absent
+          loop: "{{ dirs }}"
+
+        - file:
+            path: "{{ item }}/"
+            state: directory
+          loop: "{{ dirs }}"
+
+- delegate_to: "{{ groups.kubernetes_master.0 }}"
+  block:
+    - name: Delete the target node
+      shell: |
+        kubectl delete node/{{ ansible_fqdn }}
+      args:
+        executable: /bin/bash
+      environment:
+        KUBECONFIG: /etc/kubernetes/admin.conf

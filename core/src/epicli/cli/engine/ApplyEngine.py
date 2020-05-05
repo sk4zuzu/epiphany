@@ -15,6 +15,7 @@ from cli.engine.schema.ConfigurationAppender import ConfigurationAppender
 from cli.engine.terraform.TerraformTemplateGenerator import TerraformTemplateGenerator
 from cli.engine.terraform.TerraformRunner import TerraformRunner
 from cli.engine.ansible.AnsibleRunner import AnsibleRunner
+from cli.engine.ansible.AnsibleDownscaler import AnsibleDownscaler
 
 
 class ApplyEngine(Step):
@@ -92,39 +93,19 @@ class ApplyEngine(Step):
 
         return 0
 
-    def assert_no_master_downscale(self):
-        components = self.cluster_model.specification.components
-
-        # Skip downscale assertion for single machine clusters
-        if ('single_machine' in components) and (int(components['single_machine']['count']) > 0):
-            return
-
-        cluster_name = self.cluster_model.specification.name
-        inventory_path = get_inventory_path(cluster_name)
-
-        if os.path.isfile(inventory_path):
-            existing_inventory = InventoryManager(loader=DataLoader(), sources=inventory_path)
-
-            both_present = all([
-                'kubernetes_master' in existing_inventory.list_groups(),
-                'kubernetes_master' in components,
-            ])
-
-            if both_present:
-                prev_master_count = len(existing_inventory.list_hosts(pattern='kubernetes_master'))
-                next_master_count = int(components['kubernetes_master']['count'])
-
-                if prev_master_count > next_master_count:
-                    raise Exception("ControlPlane downscale is not supported yet. Please revert your 'kubernetes_master' count to previous value or increase it to scale up kubernetes.")
-
     def apply(self):
         self.process_input_docs()
 
-        self.assert_no_master_downscale()
+        self.process_configuration_docs()
 
         self.process_infrastructure_docs()
 
-        save_manifest([*self.input_docs, *self.infrastructure_docs], self.cluster_model.specification.name)
+        docs = [*self.configuration_docs, *self.infrastructure_docs]
+
+        with AnsibleDownscaler(self.cluster_model, docs) as ansible_downscaler:
+            ansible_downscaler.apply()
+
+        save_manifest(docs, self.cluster_model.specification.name)
 
         if not (self.skip_infrastructure or self.is_provider_any(self.cluster_model)):
             # Generate terraform templates
@@ -134,8 +115,6 @@ class ApplyEngine(Step):
             # Run Terraform to create infrastructure
             with TerraformRunner(self.cluster_model, self.configuration_docs) as tf_runner:
                 tf_runner.build()
-
-        self.process_configuration_docs()
 
         self.collect_infrastructure_config()
 

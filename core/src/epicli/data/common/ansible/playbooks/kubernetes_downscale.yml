@@ -1,0 +1,7 @@
+---
+- hosts: kubernetes_node_downscale
+  become: true
+  become_method: sudo
+  serial: 1
+  roles:
+    - kubernetes_downscale

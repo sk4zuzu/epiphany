@@ -19,9 +19,9 @@ SPEC_OUTPUT_DIR = 'spec_tests/'
 BUILD_EPICLI = 'BUILD_EPICLI'
 BUILD_LEGACY = 'BUILD_LEGACY_02X'
 
+
 def save_manifest(docs, cluster_name, manifest_name=MANIFEST_FILE_NAME):
-    build_dir = get_build_path(cluster_name)
-    path = os.path.join(build_dir, manifest_name)
+    path = get_manifest_path(cluster_name, manifest_name=manifest_name)
     with open(path, 'w') as stream:
         dump_all(docs, stream)
     return path
@@ -76,6 +76,10 @@ def get_build_path(cluster_name):
     if not os.path.exists(build_dir):
         os.makedirs(build_dir)
     return build_dir
+
+
+def get_manifest_path(cluster_name, manifest_name=MANIFEST_FILE_NAME):
+    return os.path.join(get_build_path(cluster_name), manifest_name)
 
 
 def get_inventory_path(cluster_name):
@@ -142,3 +146,6 @@ def copy_files_recursively(src, dst):
 
 def copy_file(src, dst):
     shutil.copy2(src, dst)
+
+def remove_files_recursively(dst):
+    distutils.dir_util.remove_tree(dst)

@@ -9,7 +9,9 @@ from cli.engine.ansible.AnsibleInventoryCreator import AnsibleInventoryCreator
 from cli.engine.ansible.AnsibleVarsGenerator import AnsibleVarsGenerator
 from cli.engine.ansible.AnsibleInventoryUpgrade import AnsibleInventoryUpgrade
 from cli.helpers.Step import Step
-from cli.helpers.build_saver import get_inventory_path, get_inventory_path_for_build, get_ansible_path, get_ansible_path_for_build, copy_files_recursively
+from cli.helpers.build_saver import get_inventory_path, get_inventory_path_for_build
+from cli.helpers.build_saver import get_ansible_path, get_ansible_path_for_build
+from cli.helpers.build_saver import copy_files_recursively, remove_files_recursively
 from cli.helpers.naming_helpers import to_role_name
 from cli.helpers.data_loader import DATA_FOLDER_PATH
 from cli.helpers.Config import Config
@@ -45,8 +47,8 @@ class AnsibleRunner(Step):
             ansible_dir = get_ansible_path(self.cluster_model.specification.name)
         else:
             ansible_dir = get_ansible_path_for_build(self.build_dir)
-            
-        shutil.rmtree(ansible_dir, ignore_errors=True)              
+
+        remove_files_recursively(ansible_dir)
         copy_files_recursively(AnsibleRunner.ANSIBLE_PLAYBOOKS_PATH, ansible_dir)          
 
         # copy skopeo so Ansible can move it to the repositry machine
@@ -73,11 +75,9 @@ class AnsibleRunner(Step):
         self.ansible_command.run_playbook(inventory=inventory_path,
                                           playbook_path=self.playbook_path('common'))    
 
-
     def post_flight(self, inventory_path):                                          
         self.ansible_command.run_playbook(inventory=inventory_path,
                                           playbook_path=self.playbook_path('repository_teardown'))  
-
 
     def apply(self):
         inventory_path = get_inventory_path(self.cluster_model.specification.name)
@@ -105,7 +105,6 @@ class AnsibleRunner(Step):
 
         #post-flight after we are done
         self.post_flight(inventory_path)
-
 
     def upgrade(self):
         inventory_path = get_inventory_path_for_build(self.build_dir)

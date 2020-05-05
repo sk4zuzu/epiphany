@@ -11,7 +11,7 @@ class APIProxy:
         credentials = self.cluster_model.specification.cloud.credentials
         self.session = boto3.session.Session(aws_access_key_id=credentials.key,
                                              aws_secret_access_key=credentials.secret,
-                                             region_name=self.cluster_model.specification.cloud.region)        
+                                             region_name=self.cluster_model.specification.cloud.region)
 
     def __enter__(self):
         return self
@@ -85,3 +85,131 @@ class APIProxy:
             return response['FileSystems'][0]['FileSystemId']
         raise Exception('Error requesting AWS cli: status: '+response['ResponseMetadata']['HTTPStatusCode']
                         + ' found efs:'+len(response['FileSystems']))
+
+    def get_node_auto_scaling_group_name(self):
+        cluster_name = self.cluster_model.specification.name.lower()
+
+        def match_tags(tag_items):
+            valid_tags = {
+                item['Key']: item['Value']
+                for item in tag_items
+                if 'ResourceType' in item
+                if item['ResourceType'] == 'auto-scaling-group'
+            }
+            if 'kubernetes_node' not in valid_tags:
+                return False
+            if 'cluster_name' not in valid_tags or valid_tags['cluster_name'].lower() != cluster_name:
+                return False
+            return True
+
+        def drain_api(client=self.session.client('autoscaling')):
+            paginator = client.get_paginator('describe_auto_scaling_groups')
+            for page in paginator.paginate():
+                for item in page['AutoScalingGroups']:
+                    if match_tags(item['Tags']):
+                        yield item['AutoScalingGroupName']
+
+        auto_scaling_group_names = list(drain_api())
+
+        if len(auto_scaling_group_names) == 0:
+            raise Exception('Error processing auto scaling groups: no matching kubernetes_node auto scaling groups found')
+
+        if len(auto_scaling_group_names) > 1:
+            raise Exception('Error processing auto scaling groups: expected only single matching kubernetes_node auto scaling group to be present'
+                            + ' found: ' + ', '.join(sorted(auto_scaling_group_names)))
+
+        return auto_scaling_group_names[0]
+
+    def _get_running_node_instances(self, vpc_id=None, asg_name=None):
+        if vpc_id is None:
+            vpc_id = self.get_vpc_id()
+        if asg_name is None:
+            asg_name = self.get_node_auto_scaling_group_name()
+
+        cluster_name = self.cluster_model.specification.name.lower()
+
+        running_instances = self.session.resource('ec2').instances.filter(
+            Filters=[
+                {
+                    'Name': 'instance-state-name',
+                    'Values': ['running'],
+                },
+                {
+                    'Name': 'vpc-id',
+                    'Values': [vpc_id],
+                },
+                {
+                    'Name': 'tag:cluster_name',
+                    'Values': [cluster_name],
+                },
+                {
+                    'Name': 'tag:aws:autoscaling:groupName',
+                    'Values': [asg_name],
+                },
+            ],
+        )
+
+        return set(running_instances)
+
+    def _get_newest_node_instances(self, running_instances=None):
+        if running_instances is None:
+            running_instances = self._get_running_node_instances()
+
+        sorted_instances = sorted(
+            running_instances,
+            key=(lambda instance: instance.launch_time),
+        )
+
+        prev_node_count = len(running_instances)
+        next_node_count = int(self.cluster_model.specification.components['kubernetes_node']['count'])
+        node_count = prev_node_count - next_node_count
+
+        newest_instances = sorted_instances[-node_count:]
+
+        return set(newest_instances)
+
+    # After this operation, the node autoscaling group should be ready to be scaled down
+    # What it really does is preventing "random" removal of instances
+    def get_cancelled_node_hosts(self):
+        vpc_id = self.get_vpc_id()
+        asg_name = self.get_node_auto_scaling_group_name()
+
+        running_instances = self._get_running_node_instances(vpc_id=vpc_id, asg_name=asg_name)
+        newest_instances = self._get_newest_node_instances(running_instances=running_instances)
+        older_instances = running_instances - newest_instances
+
+        client = self.session.client('autoscaling')
+
+        # Protect instances from removal
+        if len(older_instances) > 0:
+            client.set_instance_protection(
+                InstanceIds=[
+                    instance.instance_id
+                    for instance in older_instances
+                ],
+                AutoScalingGroupName=asg_name,
+                ProtectedFromScaleIn=True,
+            )
+
+        # Un-protect instances from removal
+        if len(newest_instances) > 0:
+            client.set_instance_protection(
+                InstanceIds=[
+                    instance.instance_id
+                    for instance in newest_instances
+                ],
+                AutoScalingGroupName=asg_name,
+                ProtectedFromScaleIn=False,
+            )
+
+        # Return models of hosts scheduled to be removed
+        if self.cluster_model.specification.cloud.use_public_ips:
+            return [
+                AnsibleHostModel(instance.public_dns_name, instance.public_ip_address)
+                for instance in newest_instances
+            ]
+        else:
+            return [
+                AnsibleHostModel(instance.private_dns_name, instance.private_ip_address)
+                for instance in newest_instances
+            ]
