@@ -278,7 +278,9 @@
         -c {{ specification.vault_install_dir }}/script.config
         -a {{ ansible_default_ipv4.address }}
         -p {{ vault_protocol }}
-        -v {{ vault_helm_chart_values_bool|lower }}
+        -v {{ vault_helm_chart_values_bool|lower }} |& tee -a {{ specification.vault_install_dir }}/configure-vault-debug.log
+      args:
+        executable: /bin/bash
 
     - name: Display information about running configuration script
       when:

@@ -6,6 +6,8 @@
 # TODO: Make devweb-app policy and role configurable (function integrate_with_kubernetes)
 # TODO: Make Helm chart location configurable (function configure_kubernetes)
 
+set -x
+
 HELP_MESSAGE="Usage: configure-vault.sh -c SCRIPT_CONFIGURATION_FILE_PATH -a VAULT_IP_ADDRESS -p {http|https} -v {true|false}"
 
 function print_help { echo "$HELP_MESSAGE"; }
@@ -176,11 +178,10 @@ function configure_kubernetes {
     elif [ "${command_result[1]}" = "1" ] ; then
         log_and_print "Installing Vault Agent Helm Chart...";
         if [ "$helm_custom_values_set_bool" = "true" ] ; then
-          helm upgrade --install -f /tmp/vault_helm_chart_values.yaml vault /tmp/v0.4.0.tar.gz
+          helm upgrade --install --wait -f /tmp/vault_helm_chart_values.yaml vault /tmp/v0.4.0.tar.gz
         else
-          helm upgrade --install vault /tmp/v0.4.0.tar.gz
+          helm upgrade --install --wait vault /tmp/v0.4.0.tar.gz
         fi
-        
         check_status $? "Vault Agent Helm Chart installed." "There was an error during installation of Vault Agent Helm Chart.";
     fi
 }
@@ -322,7 +323,6 @@ if [ "${KUBERNETES_INTEGRATION,,}" = "true" ]  || [ "${ENABLE_VAULT_KUBERNETES_A
     enable_vault_kubernetes_authentication;
 fi
 
-apply_epiphany_vault_policies "$VAULT_CONFIG_DATA_PATH";
 enable_vault_userpass_authentication;
 
 if [ "${CREATE_VAULT_USERS,,}" = "true" ] ; then
@@ -336,3 +336,5 @@ fi
 if [ "${KUBERNETES_CONFIGURATION,,}" = "true" ] ; then
     configure_kubernetes "$VAULT_INSTALL_PATH" "$KUBERNETES_NAMESPACE" "$VAULT_PROTOCOL" "$HELM_CUSTOM_VALUES_SET_BOOL";
 fi
+
+apply_epiphany_vault_policies "$VAULT_CONFIG_DATA_PATH";
