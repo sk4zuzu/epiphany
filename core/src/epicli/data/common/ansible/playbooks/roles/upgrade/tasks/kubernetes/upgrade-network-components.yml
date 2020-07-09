@@ -1,18 +1,26 @@
 ---
+- name: upgrade-master | Wait for api resources to propagate?
+  shell: |
+    kubectl api-resources --cached=false && kubectl -n kube-system get daemonsets
+  environment:
+    KUBECONFIG: &KUBECONFIG /home/{{ admin_user.name }}/.kube/config
+  changed_when: false
+  register: daemonsets_query_result
+  until: daemonsets_query_result is success
+  retries: 20
+  delay: 30
 
 - name: upgrade-master | Set default cni plugin - flannel
   set_fact:
     plugin: "flannel"
 
 - name: upgrade-master | If canal is installed on the cluster
-  environment:
-    KUBECONFIG: /home/{{ admin_user.name }}/.kube/config
-  shell: |-
+  shell: |
     kubectl -n kube-system get daemonsets -l k8s-app=canal
+  environment:
+    KUBECONFIG: *KUBECONFIG
   changed_when: false
   register: canal_query_result
-  args:
-    executable: /bin/bash
 
 - name: upgrade-master | Set network plugin variable to canal
   set_fact:
@@ -21,14 +29,12 @@
     - '"canal" in canal_query_result.stdout'
 
 - name: upgrade-master | If calico is installed on the cluster
-  environment:
-    KUBECONFIG: /home/{{ admin_user.name }}/.kube/config
-  shell: |-
+  shell: |
     kubectl -n kube-system get daemonsets -l k8s-app=calico-node
+  environment:
+    KUBECONFIG: *KUBECONFIG
   changed_when: false
   register: calico_query_result
-  args:
-    executable: /bin/bash
 
 - name: upgrade-master | Set network plugin variable to calico
   set_fact:
