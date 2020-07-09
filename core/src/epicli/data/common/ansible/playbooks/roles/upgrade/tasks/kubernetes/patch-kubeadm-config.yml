@@ -5,42 +5,36 @@
 # kube-apiserver uses --encryption-provider-config parameter to control how data is encrypted in etcd.
 # If this parameter is absent the encryption is not enabled.
 - name: upgrade-master | Check if encryption of secret data is enabled
-  shell: >-
-    grep -- '--encryption-provider-config' /etc/kubernetes/manifests/kube-apiserver.yaml
-  args:
-    executable: /bin/bash
-  register: shell_grep_encryption_flag
+  lineinfile:
+    dest: /etc/kubernetes/manifests/kube-apiserver.yaml
+    regexp: '--encryption-provider-config'
+    state: absent
+  register: lineinfile_encryption_flag
+  check_mode: true
   changed_when: false
-  failed_when: shell_grep_encryption_flag.rc > 1
 
 - name: upgrade-master | Patch kubeadm-config ConfigMap if needed
   when:
-    - shell_grep_encryption_flag.rc == 0 # encryption enabled
-  run_once: true  # makes no sense to execute it more than once (would be redundant)
+    - lineinfile_encryption_flag.found  # encryption enabled
   block:
-    - name: Get kubeadm-config ConfigMap
+    - name: upgrade-master | Get kubeadm-config ConfigMap
       shell: |
         kubectl get configmap kubeadm-config \
           --namespace kube-system \
           --output yaml
-      args:
-        executable: /bin/bash
       environment:
         KUBECONFIG: &KUBECONFIG /etc/kubernetes/admin.conf
       register: shell_kubeadm_configmap
       changed_when: false
 
     # The following procedure ensures that etcd encryption is always enabled during subsequent kubeadm executions
-    - name: upgrade-master | Patch and re-apply the kubeadm-config ConfigMap
+    - name: upgrade-master | Patch kubeadm-config ConfigMap (patch-kubeadm-config.yml)
       when:
         - _kubeadm_api_server_extra_args['encryption-provider-config'] is undefined
       shell: |
-        kubectl apply \
+        kubectl patch configmap kubeadm-config \
           --namespace kube-system \
-          --filename - \
-          <<< "$KUBEADM_CONFIGMAP_DOCUMENT"
-      args:
-        executable: /bin/bash
+          --patch "$KUBEADM_CONFIGMAP_DOCUMENT"
       environment:
         KUBECONFIG: *KUBECONFIG
         # Render an altered kubeadm-config configmap document
