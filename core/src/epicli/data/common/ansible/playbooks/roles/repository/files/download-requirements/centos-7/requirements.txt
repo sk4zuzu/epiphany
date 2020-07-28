@@ -3,6 +3,7 @@
 [packages-repo-prereqs]
 apr # for httpd
 apr-util # for httpd
+centos-logos
 createrepo
 deltarpm # for createrepo
 httpd
@@ -13,8 +14,8 @@ mod_ssl # for httpd
 python-chardet # for createrepo
 python-deltarpm # for createrepo
 python-kitchen # for createrepo
-centos-logos
 yum-utils
+mc
 
 [packages]
 audit # for docker-ce
