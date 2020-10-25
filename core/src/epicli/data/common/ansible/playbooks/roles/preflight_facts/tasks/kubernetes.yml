@@ -39,10 +39,10 @@
   set_fact:
     registered_masters: >-
       {{ available_masters | map('extract', hostvars, ['master_already_joined'])
-      | zip(available_masters)
-      | selectattr(0)
-      | map(attribute=1)
-      | list }}
+                           | zip(available_masters)
+                           | selectattr(0)
+                           | map(attribute=1)
+                           | list }}
 
 - when: (registered_masters.0 is defined) and (inventory_hostname == registered_masters.0)
   block:
@@ -71,8 +71,7 @@
         control_plane_endpoint: >-
           {{ ClusterConfiguration.controlPlaneEndpoint | default('') }}
         repository_hostname: >-
-          {{ ( 'http://' ~ ClusterConfiguration.imageRepository )
-          | urlsplit('hostname') }}
+          {{ ( 'http://' ~ ClusterConfiguration.imageRepository ) | urlsplit('hostname') }}
 
 - name: Proxy control_plane_endpoint fact
   set_fact:
@@ -153,9 +152,7 @@
       {{ dict(ipv4_addresses | zip(groups.all)) }}
   vars:
     ipv4_addresses: >-
-      {{ groups.all
-      | map('extract', hostvars, ['ansible_default_ipv4', 'address'])
-      | list }}
+      {{ groups.all | map('extract', hostvars, ['ansible_default_ipv4', 'address']) | list }}
 
 - name: PREFLIGHT_FACTS | Resolve default repository and image registry hostnames
   set_fact:
