@@ -33,6 +33,10 @@ if $IS_OFFLINE_MODE = true; then
     #rm -f ${EPI_REPO_SERVER_PATH}/packages/Packages.gz
     echo "updating list of available packages..."
     apt -y update
+    if [[ -f /etc/apt/sources.list.bak ]] && [[ ! -f /etc/apt/sources.list ]]; then
+        echo "enabling default repositories..."
+        mv /etc/apt/sources.list.bak /etc/apt/sources.list
+    fi
 else
     # for online mode just install apache
     echo "installing apache..."
