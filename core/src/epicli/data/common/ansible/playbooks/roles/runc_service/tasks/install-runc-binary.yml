@@ -1,0 +1,21 @@
+---
+- name: Download runc binary from epirepo
+  include_role:
+    name: download
+    tasks_from: download_file
+  vars:
+    file_name: "{{ runc_file }}"
+    validate_certs: false
+
+- name: Create {{ runc_dir }}/bin/ directory
+  file:
+    path: "{{ runc_dir }}/bin/"
+    state: directory
+    mode: u=rwx,go=rx
+
+- name: Deploy {{ runc_binary }}
+  copy:
+    dest: "{{ runc_binary }}"
+    src: "{{ download_directory }}/{{ runc_file }}"
+    remote_src: true
+    mode: u=rwx,go=rx
