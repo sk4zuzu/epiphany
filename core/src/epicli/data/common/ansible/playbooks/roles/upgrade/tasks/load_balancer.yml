@@ -8,4 +8,4 @@
     name: haproxy
     vars_from: manifest
   vars:
-    haproxy_upgrade_enabled: true
+    service_upgrade_enabled: true

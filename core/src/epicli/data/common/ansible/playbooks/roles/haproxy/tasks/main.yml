@@ -6,17 +6,25 @@
   template:
     dest: /etc/haproxy/haproxy.cfg
     src: haproxy.cfg.j2
+    mode: u=rw,g=r,o=
   register: template_haproxy_cfg
 
 - name: Setup and start haproxy runc-based systemd service
-  include_role: { name: haproxy_runc }
+  include_role: { name: runc_service }
   vars:
-    haproxy_service: haproxy
-    extra_mounts:
+    service_name: haproxy
+    service_image_tar: "{{ haproxy_image_tar }}"
+    service_description: "HAProxy Load Balancer"
+    service_mounts:
+      - destination: /etc/haproxy/
+        source: /etc/haproxy/
+        type: bind
+        options: [rbind, ro]
       - destination: /etc/ssl/haproxy/
         source: /etc/ssl/haproxy/
         type: bind
         options: [rbind, ro]
+    service_command: [/usr/local/sbin/haproxy, -W, -f, /etc/haproxy/haproxy.cfg]
 
 - name: Reload haproxy service
   systemd:
