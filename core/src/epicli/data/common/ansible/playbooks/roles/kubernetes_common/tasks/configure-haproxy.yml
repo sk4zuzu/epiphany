@@ -6,13 +6,9 @@
   vars:
     set_fact:
       haproxy_master_names: >-
-        {{ groups.kubernetes_master
-        | map('extract', hostvars, ['inventory_hostname'])
-        | list }}
+        {{ groups.kubernetes_master | map('extract', hostvars, ['inventory_hostname']) | list }}
       haproxy_master_ipv4s: >-
-        {{ groups.kubernetes_master
-        | map('extract', hostvars, ['ansible_default_ipv4', 'address'])
-        | list }}
+        {{ groups.kubernetes_master | map('extract', hostvars, ['ansible_default_ipv4', 'address']) | list }}
 
 - name: Prepare backend configuration for HAProxy
   set_fact:
@@ -24,25 +20,35 @@
         {{ kubernetes_common.haproxy_master_names | zip(kubernetes_common.haproxy_master_ipv4s) | list }}
 
 - name: Configure and start haproxy "distributed" load-balancer
-  vars: { haproxy_service: haproxy-k8s }
+  vars: { service_name: haproxy-k8s }
   block:
-    - name: Ensure /etc/{{ haproxy_service }}/ directory exists
+    - name: Ensure /etc/{{ service_name }}/ directory exists
       file:
-        path: /etc/{{ haproxy_service }}/
+        path: /etc/{{ service_name }}/
         state: directory
+        mode: u=rwx,g=rx,o=
 
     - name: Render haproxy config
       template:
-        dest: /etc/{{ haproxy_service }}/haproxy.cfg
+        dest: /etc/{{ service_name }}/haproxy.cfg
         src: haproxy.cfg.j2
+        mode: u=rw,g=r,o=
       register: template_haproxy_cfg
 
-    - name: Setup and start {{ haproxy_service }} service
-      include_role:
-        name: haproxy_runc
+    - name: Setup and start {{ service_name }} service
+      include_role: { name: runc_service }
+      vars:
+        service_image_tar: "{{ haproxy_image_tar }}"
+        service_description: "HAProxy Load Balancer (k8s)"
+        service_mounts:
+          - destination: /etc/haproxy/
+            source: /etc/{{ service_name }}/
+            type: bind
+            options: [rbind, ro]
+        service_command: [/usr/local/sbin/haproxy, -W, -f, /etc/haproxy/haproxy.cfg]
 
-    - name: Reload {{ haproxy_service }} service
+    - name: Reload {{ service_name }} service
       systemd:
-        name: "{{ haproxy_service }}"
+        name: "{{ service_name }}"
         state: reloaded
       when: template_haproxy_cfg is changed
