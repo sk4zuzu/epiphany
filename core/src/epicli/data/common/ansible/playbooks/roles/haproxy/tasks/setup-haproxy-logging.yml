@@ -12,8 +12,7 @@
   systemd:
     name: rsyslog
     state: restarted
-  when:
-    - template_haproxy_rsyslog_conf is changed
+  when: template_haproxy_rsyslog_conf is changed
 
 # Logrotate is executed in cron, please take a look at the "common" role
 - name: Copy logrotate config
