@@ -172,6 +172,7 @@ kubernetes-cni 0.7.5-00
 kubernetes-cni 0.8.6-00
 
 [files]
+https://github.com/opencontainers/runc/releases/download/v1.0.0-rc92/runc.amd64
 https://repo1.maven.org/maven2/io/prometheus/jmx/jmx_prometheus_javaagent/0.12.0/jmx_prometheus_javaagent-0.12.0.jar
 https://archive.apache.org/dist/kafka/2.3.1/kafka_2.12-2.3.1.tgz
 https://archive.apache.org/dist/zookeeper/zookeeper-3.4.12/zookeeper-3.4.12.tar.gz
