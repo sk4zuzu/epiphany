@@ -163,6 +163,7 @@ https://helm.elastic.co/helm/filebeat/filebeat-7.9.2.tgz
 
 [images]
 haproxy:2.2.2-alpine
+httpd:2.4.46-alpine
 kubernetesui/dashboard:v2.0.3
 kubernetesui/metrics-scraper:v1.0.4
 registry:2
