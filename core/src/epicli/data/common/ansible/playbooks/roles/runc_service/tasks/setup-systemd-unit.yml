@@ -1,0 +1,17 @@
+---
+- name: Assert input parameters
+  assert:
+    that:
+      - service_name is defined
+      - service_description is defined
+
+- name: Render {{ service_name }} service systemd unit
+  template:
+    dest: /etc/systemd/system/{{ service_name }}.service
+    src: systemd.service.j2
+  register: template_systemd_service
+
+- name: Mark {{ service_name }} service to be restarted
+  set_fact:
+    service_needs_restart: >-
+      {{ service_needs_restart or ((template_systemd_service is defined) and (template_systemd_service is changed)) }}

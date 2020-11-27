@@ -1,0 +1,19 @@
+# {{ ansible_managed }}
+[Unit]
+Description={{ service_description }}
+After=network-online.target
+After=rsyslog.service
+Requires=rsyslog.service
+Wants=network-online.target
+
+[Service]
+Type=forking
+WorkingDirectory={{ service_dir }}
+ExecStart={{ runc_binary }} run --detach --pid-file /run/{{ service_name }}.pid {{ service_name }}
+ExecReload={{ runc_binary }} kill {{ service_name }} SIGUSR2
+ExecStopPost={{ runc_binary }} delete {{ service_name }}
+PIDFile=/run/{{ service_name }}.pid
+Restart=always
+
+[Install]
+WantedBy=multi-user.target

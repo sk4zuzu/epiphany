@@ -1,0 +1,71 @@
+---
+- name: Assert input parameters
+  assert:
+    that:
+      - service_name is defined
+      - service_command is defined
+      - service_image_tar is defined
+
+- name: Download docker image archive
+  include_role:
+    name: download
+    tasks_from: download_image
+  vars:
+    file_name: "{{ service_image_tar }}"
+    validate_certs: false
+
+- name: Extract haproxy docker image
+  script:
+    cmd: extract-docker-image-V1.sh
+  environment:
+    IMAGE_TAR: "{{ download_directory }}/{{ service_image_tar }}"
+    OUTPUT_DIR: "{{ service_dir }}/rootfs"
+  args:
+    chdir: /tmp  # free disk space is required (2x size of the image) (seems to be using ~/.ansible/tmp/)
+    creates: "{{ service_dir }}/rootfs/"
+    executable: /bin/bash
+
+- name: Create initial config.json file
+  command: "{{ runc_binary }} spec"
+  args:
+    chdir: "{{ service_dir }}/"
+    creates: "{{ service_dir }}/config.json"
+
+- name: Slurp config.json file contents
+  slurp:
+    src: "{{ service_dir }}/config.json"
+  register: slurp_config_json
+
+- name: Adjust and save config.json file contents
+  copy:
+    dest: "{{ service_dir }}/config.json"
+    # Update and render json payload
+    content: |
+      {{ _updated_document | to_nice_json }}
+  register: copy_config_json
+
+  when: _updated_document != _document
+
+  vars:
+    # Parse json payload
+    _document: >-
+      {{ slurp_config_json.content | b64decode | from_json }}
+    # Assemble document update
+    _update:
+      process:
+        args: "{{ service_command }}"
+        terminal: false  # required for running it detached
+      linux:
+        # Remove "network" namespace to enable "host-networking"
+        namespaces: >-
+          {{ _document.linux.namespaces | selectattr('type', '!=', 'network') | list }}
+      # Merge cointainer's volume / mount definitions
+      mounts: >-
+        {{ (_document.mounts + service_mounts) | unique }}
+    _updated_document: >-
+      {{ _document | combine(_update, recursive=true) }}
+
+- name: Mark {{ service_name }} service to be restarted
+  set_fact:
+    service_needs_restart: >-
+      {{ service_needs_restart or ((copy_config_json is defined) and (copy_config_json is changed)) }}

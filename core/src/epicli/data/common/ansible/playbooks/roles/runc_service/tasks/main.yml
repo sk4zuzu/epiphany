@@ -1,0 +1,51 @@
+---
+- name: Assert input parameters
+  assert:
+    that:
+      - service_name is defined
+
+- name: Set service related facts
+  set_fact:
+    service_dir: "{{ runc_dir }}/{{ service_name }}"
+    service_needs_restart: false
+
+- name: Install required system packages
+  include_tasks: install-runc-binary.yml
+  when: runc_install_binary
+
+- name: Remove haproxy container (upgrade)
+  when: service_upgrade_enabled
+  block:
+    - name: Populate service facts
+      service_facts:
+      no_log: true
+
+    - name: Stop {{ service_name }} service (upgrade)
+      systemd:
+        name: "{{ service_name }}"
+        state: stopped
+      when: ansible_facts.services["{{ service_name }}.service"] is defined
+
+    - name: Remove {{ service_name }} rootfs data (upgrade)
+      file:
+        path: "{{ service_dir }}/rootfs/"
+        state: absent
+
+- name: Setup runc container
+  include_tasks: setup-runc-container.yml
+
+- name: Setup systemd unit
+  include_tasks: setup-systemd-unit.yml
+
+- name: Ensure {{ service_name }} service is running
+  systemd:
+    name: "{{ service_name }}"
+    state: started
+    enabled: true
+    daemon_reload: true
+
+- name: Restart {{ service_name }} service
+  systemd:
+    name: "{{ service_name }}"
+    state: restarted
+  when: service_needs_restart

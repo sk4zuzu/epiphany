@@ -1,0 +1,8 @@
+---
+runc_dir: "/opt/runc"
+runc_file: "runc.amd64"
+runc_binary: "{{ runc_dir }}/bin/runc"
+runc_install_binary: true
+
+service_mounts: []
+service_upgrade_enabled: false
