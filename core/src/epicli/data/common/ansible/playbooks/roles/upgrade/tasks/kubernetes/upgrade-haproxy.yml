@@ -25,7 +25,7 @@
         name: kubernetes_common
         tasks_from: configure-haproxy.yml
       vars:
-        haproxy_upgrade_enabled: true
+        service_upgrade_enabled: true
 
     - name: k8s/haproxy | Wait for cluster's readiness
       include_tasks: utils/wait.yml
