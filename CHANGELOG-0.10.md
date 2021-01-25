@@ -11,6 +11,7 @@
 - [#1959](https://github.com/epiphany-platform/epiphany/issues/1959) - Network traffic not allowed from load balancer's subnet to Kubernetes's subnet in AWS
 - [#1991](https://github.com/epiphany-platform/epiphany/issues/1991) - When custom repo is used backup/recovery stops working
 - [#1908](https://github.com/epiphany-platform/epiphany/issues/1908) - Research why Epiphany nodes hang when memory is overcommited
+- [#1824](https://github.com/epiphany-platform/epiphany/issues/1824) - offline installation fails with error 'yum lockfile is held by another process' (Azure/RHEL)
 
 ### Updated
 
